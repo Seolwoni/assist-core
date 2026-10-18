@@ -104,7 +104,8 @@ public final class Body {
 		// Ease off: only push forward while facing roughly the right way, and tap it when very close.
 		boolean push = yawErr < 35f && (dist > 0.5 || walkTicks % 2 == 0);
 		mc.options.keyUp.setDown(push);
-		mc.options.keyJump.setDown(dyFeet > 0.5 && p.onGround());
+		// Swim: keep the head above water (and climb out of a water hole onto the next cell).
+		mc.options.keyJump.setDown((dyFeet > 0.5 && p.onGround()) || p.isInWater());
 		return false;
 	}
 
@@ -132,7 +133,8 @@ public final class Body {
 		float yawErr = Math.abs(wrap(yaw - p.getYRot()));
 		mc.options.keyUp.setDown(yawErr < 45f);
 		mc.options.keySprint.setDown(sprint && yawErr < 20f && p.getFoodData().getFoodLevel() > 6);
-		mc.options.keyJump.setDown(dyFeet > 0.5 && p.onGround());
+		// Swim: keep the head above water (and climb out of a water hole onto the next cell).
+		mc.options.keyJump.setDown((dyFeet > 0.5 && p.onGround()) || p.isInWater());
 		return false;
 	}
 
