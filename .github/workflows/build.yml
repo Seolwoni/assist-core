@@ -1,0 +1,49 @@
+name: build
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'microsoft'
+      - run: chmod +x ./gradlew
+      - name: build
+        run: |
+          set -o pipefail
+          ./gradlew build --stacktrace 2>&1 | tee build.log
+      - name: save log
+        if: always()
+        run: |
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          grep -A6 "error:" build.log | head -300 > /tmp/compile.txt || true
+          tail -300 build.log > /tmp/tail.txt
+          git checkout --orphan ci-log
+          git rm -rf --cached . > /dev/null
+          cp /tmp/compile.txt /tmp/tail.txt .
+          git add compile.txt tail.txt
+          git commit -m "build log ${{ github.run_number }}"
+          git push -f origin ci-log
+      - name: release notes
+        run: |
+          VER=$(grep "^version = " build.gradle | sed "s/version = '\(.*\)'/\1/")
+          echo "VER=$VER" >> $GITHUB_ENV
+          awk -v v="## $VER" '$0 ~ "^## " { if (p) exit; if (index($0, v) == 1) p = 1 } p' CHANGELOG.md > release-notes.md
+          printf '\n---\nAssist 시리즈 공용 라이브러리. 각 Assist 모드 안에 이미 들어 있어서 따로 설치하지 않아도 돼요.\n' >> release-notes.md
+      - name: release
+        if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[no release]')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VER }}-build-${{ github.run_number }}
+          name: Assist Core ${{ env.VER }} (build ${{ github.run_number }})
+          body_path: release-notes.md
+          files: build/libs/assistcore-*.jar
